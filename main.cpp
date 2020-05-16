@@ -6,8 +6,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-
 using namespace std;
+
+#define BUFF_SIZE 1024
 
 
 bool ReadFile( string file_path, string arch_path, string arch_meta_path )
@@ -15,16 +16,17 @@ bool ReadFile( string file_path, string arch_path, string arch_meta_path )
 	int		inner_file, arch_file, arch_meta_file;
 
 	inner_file	=	open( file_path.c_str(), O_RDONLY, S_IREAD|S_IWRITE );
-	arch_file 	=	open( arch_path.c_str(), O_WRONLY|O_APPEND, S_IREAD|S_IWRITE );
+	if ((arch_file 	=	open( arch_path.c_str(), O_WRONLY|O_APPEND, S_IREAD|S_IWRITE )) == -1)
+		return false;
 
 	if ( inner_file != -1 )
 	{
 		unsigned int	file_size 			=	0;
-		char			reading_buffer[1024];
+		char			reading_buffer[BUFF_SIZE];
 
 		while ( true )
 		{
-			unsigned int count_bytes	=	read( inner_file, reading_buffer, 1024 );
+			unsigned int count_bytes	=	read( inner_file, reading_buffer, BUFF_SIZE );
 
 			if ( count_bytes )
 			{
@@ -38,7 +40,8 @@ bool ReadFile( string file_path, string arch_path, string arch_meta_path )
 		close( inner_file );
 		close( arch_file );
 
-		arch_meta_file 	=	open( arch_meta_path.c_str(), O_WRONLY|O_APPEND, S_IREAD|S_IWRITE );
+		if ((arch_meta_file 	=	open( arch_meta_path.c_str(), O_WRONLY|O_APPEND, S_IREAD|S_IWRITE )) == -1)
+			return false;
 
 		write( arch_meta_file, ( file_path + "\n" ).c_str(), file_path.size()+1 );
 		write( arch_meta_file, ( to_string( file_size ) + "\n").c_str(),( to_string( file_size ) + "\n" ).size() );
@@ -85,8 +88,9 @@ bool ReadArchMeta( string placement_path, string arch_path, string arch_meta_pat
 	string 	buffer_str;
 	int		meta_file, arch_file, writing_file;
 
-	meta_file 								=	open( arch_meta_path.c_str(), O_RDONLY, S_IREAD|S_IWRITE );
-	arch_file								=	open( arch_path.c_str(), O_RDONLY, S_IREAD|S_IWRITE );
+	meta_file =	open( arch_meta_path.c_str(), O_RDONLY, S_IREAD|S_IWRITE );
+	if ((arch_file	=	open( arch_path.c_str(), O_RDONLY, S_IREAD|S_IWRITE )) == -1)
+		return false;
 
 	if ( meta_file != -1 )
 	{
@@ -94,11 +98,11 @@ bool ReadArchMeta( string placement_path, string arch_path, string arch_meta_pat
 		string 			path_str;
 		string 			rewriting_buffer_str;
 		bool			find_flag 			= false;
-		char			reading_buffer[1024];
+		char			reading_buffer[BUFF_SIZE];
 
 		while ( true )
 		{
-			unsigned int 	count_bytes		=	read( meta_file, reading_buffer, 1024 );
+			unsigned int 	count_bytes		=	read( meta_file, reading_buffer, BUFF_SIZE );
 
 			if ( count_bytes )
 			{
@@ -122,16 +126,17 @@ bool ReadArchMeta( string placement_path, string arch_path, string arch_meta_pat
 
 						CreateDirs( path_str );
 
-						writing_file		=	open( path_str.c_str(), O_CREAT|O_WRONLY, S_IREAD|S_IWRITE );
+						if ((writing_file		=	open( path_str.c_str(), O_CREAT|O_WRONLY, S_IREAD|S_IWRITE )) == -1)
+							return false;
 
 
-						if (( arch_file != -1 )&&( writing_file != -1 ))
+						if (writing_file != -1)
 						{
 							while ( true )
 							{
 								unsigned int current_file_size;
-								if(file_size>=1024)
-									current_file_size = 1024;
+								if(file_size >= BUFF_SIZE)
+									current_file_size = BUFF_SIZE;
 								else
 									current_file_size = file_size;
 								current_file_size = read(arch_file, reading_buffer, current_file_size);
@@ -195,8 +200,6 @@ bool MakeDirMap( string dir, string arch_path, string arch_meta_path )
 			else
 			{
 				ReadFile( dir + reading_dir->d_name, arch_path, arch_meta_path );
-				unlink( ( dir + reading_dir->d_name ).c_str() );
-				rmdir( dir.c_str() );
 			}
 		}
 		closedir( current_dir );
@@ -319,11 +322,15 @@ int main(int n, char **argc)
 	{
 		if (!strcmp(argc[1], "pack"))
 		{
-			Pucking(argc[2], argc[3], argc[4]);
+			string buff = string(argc[3]) + "_meta";
+			if(Pucking(argc[2], argc[3], buff) == false)
+				cout<<"Error"<<endl;
 		}
 		else if (!strcmp(argc[1], "unpack"))
 		{
-			Unpucking(argc[2], argc[3], argc[4]);
+			string buff = string(argc[3]) + "_meta";
+			if(Unpucking(argc[2], argc[3], buff) == false)
+				cout<<"Error"<<endl;
 		}
 		else
 		{
